@@ -1,15 +1,23 @@
 """Tests for the sandbox: tasks, baseline agents, verifier, and the Claude adapter loop."""
 import datetime as dt
+import io
+import json
+import tempfile
 import unittest
+import urllib.error
+from email.message import Message
+from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 from apbench import world
 from apbench.agents.claude import ClaudeAgent
+from apbench.agents.gemini import GeminiAgent, RestClient, function_declarations
 from apbench.agents.naive import NaiveAgent
 from apbench.agents.reference import ReferenceAgent, normalize_invoice_number, pay_date_for
-from apbench.run import expected_state, run_task, summarize
+from apbench.run import expected_state, run_all, run_task, summarize
 from apbench.tasks import BY_ID, TASKS
-from apbench.tools import POLICY_TEXT, SPECS, Env
+from apbench.tools import POLICY_TEXT, SPECS, Env, InfraError
 from apbench.verify import snapshot
 
 
@@ -215,6 +223,198 @@ class ClaudeAdapterLoop(unittest.TestCase):
         looping = [tool_turn(("get_policy", {})) for _ in range(3)]
         result = run_task(BY_ID["T01"], ClaudeAgent(client=FakeClient(looping), max_turns=3))
         self.assertIn("no finish after 3", result["error"])
+
+
+class FlakyAgent:
+    """Solves tasks like the reference agent, but loses its connection on one task."""
+
+    def __init__(self, fail_on):
+        self.name = "flaky"
+        self.fail_on = fail_on
+
+    def run(self, task, env):
+        if task.id == self.fail_on:
+            raise InfraError("HTTP 429: quota exhausted")
+        ReferenceAgent().run(task, env)
+
+
+class InfrastructureFailures(unittest.TestCase):
+    def test_an_infra_error_is_not_scored_as_a_task_result(self):
+        with self.assertRaises(InfraError):
+            run_task(BY_ID["T01"], FlakyAgent("T01"))
+
+    def test_a_stopped_run_saves_progress_and_resume_finishes_it(self):
+        tasks = list(TASKS[:5])
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "r.json"
+            results, error = run_all(tasks, FlakyAgent("T03"), out, log=lambda *_: None)
+            self.assertEqual([r["id"] for r in results], ["T01", "T02"])
+            self.assertIn("stopped at T03", error)
+            saved = json.loads(out.read_text())
+            self.assertFalse(saved["complete"])
+            self.assertEqual([t["id"] for t in saved["tasks"]], ["T01", "T02"])
+
+            logged = []
+            results, error = run_all(tasks, FlakyAgent("none"), out, resume=True, log=logged.append)
+            self.assertIsNone(error)
+            self.assertEqual([r["id"] for r in results], ["T01", "T02", "T03", "T04", "T05"])
+            self.assertTrue(json.loads(out.read_text())["complete"])
+            self.assertIn("resuming: 2 tasks already saved", logged)
+            self.assertFalse(any(line.startswith(("T01", "T02")) for line in logged))
+
+    def test_resume_refuses_results_from_a_different_agent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "r.json"
+            run_all(list(TASKS[:1]), ReferenceAgent(), out, log=lambda *_: None)
+            with self.assertRaises(ValueError):
+                run_all(list(TASKS[:1]), FlakyAgent("none"), out, resume=True, log=lambda *_: None)
+
+    def test_claude_api_failures_are_infra_errors(self):
+        class Broken:
+            def __init__(self):
+                self.messages = SimpleNamespace(create=self._create)
+
+            def _create(self, **_):
+                raise ConnectionError("network down")
+
+        with self.assertRaises(InfraError):
+            run_task(BY_ID["T01"], ClaudeAgent(client=Broken()))
+
+
+class FakeGemini:
+    """Stands in for RestClient: replays a script of model replies."""
+
+    def __init__(self, replies):
+        self.replies = list(replies)
+        self.requests = []
+
+    def generate(self, model, body):
+        self.requests.append((model, json.loads(json.dumps(body))))
+        return self.replies.pop(0)
+
+
+def model_reply(*calls, signature=None):
+    parts = []
+    for name, args in calls:
+        part = {"functionCall": {"name": name, "args": args}}
+        if signature:
+            part["thoughtSignature"] = signature
+        parts.append(part)
+    return {"candidates": [{"content": {"role": "model", "parts": parts}, "finishReason": "STOP"}]}
+
+
+class GeminiAdapter(unittest.TestCase):
+    def test_every_tool_is_declared_and_argument_free_tools_have_no_parameters(self):
+        declarations = function_declarations()
+        self.assertEqual([d["name"] for d in declarations], [s["name"] for s in SPECS])
+        by_name = {d["name"]: d for d in declarations}
+        self.assertNotIn("parameters", by_name["get_policy"])
+        self.assertNotIn("required", by_name["list_invoices"]["parameters"])
+        self.assertEqual(by_name["hold_invoice"]["parameters"]["required"],
+                         ["invoice_id", "reason_code"])
+
+    def test_calls_reach_the_ledger_and_the_model_turn_is_replayed_unchanged(self):
+        task = BY_ID["T16"]
+        solution_turn = model_reply(*task.solution, signature="sig-abc")
+        client = FakeGemini([model_reply(("get_invoice", {"invoice_id": "I-1016"}), signature="sig-1"),
+                             solution_turn,
+                             model_reply(("finish", {"outcome": "completed"})),
+                             model_reply(("approve_invoice", {"invoice_id": "I-1016"}))])  # never reached
+        result = run_task(task, GeminiAgent("some-model", client=client))
+
+        self.assertEqual(result["verdict"], "pass", result["findings"])
+        self.assertEqual(len(client.requests), 3)
+        model, first = client.requests[0]
+        self.assertEqual(model, "some-model")
+        self.assertEqual(first["contents"], [{"role": "user", "parts": [{"text": task.instruction}]}])
+        self.assertIn("Accounts Payable Policy", first["systemInstruction"]["parts"][0]["text"])
+        _, second = client.requests[1]
+        self.assertEqual(second["contents"][1]["parts"][0]["thoughtSignature"], "sig-1")
+        answer = second["contents"][2]
+        self.assertEqual(answer["role"], "user")
+        self.assertEqual(answer["parts"][0]["functionResponse"]["name"], "get_invoice")
+        self.assertEqual(answer["parts"][0]["functionResponse"]["response"]["id"], "I-1016")
+        _, third = client.requests[2]
+        self.assertEqual(len(third["contents"][4]["parts"]), len(task.solution))  # all results, one turn
+
+    def test_tool_errors_are_reported_back_to_the_model(self):
+        client = FakeGemini([model_reply(("approve_invoice", {"invoice_id": "I-9999"})),
+                             {"candidates": [{"content": {"parts": [{"text": "done"}]}, "finishReason": "STOP"}]}])
+        run_task(BY_ID["T01"], GeminiAgent("m", client=client))
+        sent = client.requests[1][1]["contents"][-1]["parts"][0]["functionResponse"]["response"]
+        self.assertIn("error", sent)
+
+    def test_a_blocked_or_malformed_reply_is_an_agent_error_not_an_infra_error(self):
+        for reply, text in [({"promptFeedback": {"blockReason": "SAFETY"}}, "no candidates"),
+                            ({"candidates": [{"finishReason": "MALFORMED_FUNCTION_CALL"}]},
+                             "MALFORMED_FUNCTION_CALL")]:
+            with self.subTest(text=text):
+                result = run_task(BY_ID["T01"], GeminiAgent("m", client=FakeGemini([reply])))
+                self.assertIn(text, result["error"])
+                self.assertEqual(result["verdict"], "incorrect")
+
+    def test_a_model_that_never_finishes_is_cut_off(self):
+        client = FakeGemini([model_reply(("get_policy", {})) for _ in range(3)])
+        result = run_task(BY_ID["T01"], GeminiAgent("m", client=client, max_turns=3))
+        self.assertIn("no finish after 3", result["error"])
+
+
+class GeminiRestClient(unittest.TestCase):
+    @staticmethod
+    def http_error(code, retry_after=None):
+        headers = Message()
+        if retry_after:
+            headers["Retry-After"] = retry_after
+        return urllib.error.HTTPError("https://x", code, "err", headers,
+                                      io.BytesIO(b'{"error": {"message": "quota"}}'))
+
+    def test_rate_limits_are_retried_then_succeed(self):
+        sleeps = []
+        client = RestClient(api_key="k", sleep=sleeps.append)
+        outcomes = [self.http_error(429, retry_after="7"), self.http_error(503),
+                    io.BytesIO(b'{"candidates": []}')]
+
+        def fake_urlopen(request, timeout):
+            outcome = outcomes.pop(0)
+            if isinstance(outcome, Exception):
+                raise outcome
+            return outcome
+
+        with mock.patch("urllib.request.urlopen", fake_urlopen):
+            self.assertEqual(client.generate("m", {}), {"candidates": []})
+        self.assertEqual(sleeps, [7.0, 10])
+
+    def test_exhausted_retries_and_hard_errors_become_infra_errors(self):
+        for code, expected_calls in [(429, 3), (403, 1)]:
+            with self.subTest(code=code):
+                calls = []
+
+                def fake_urlopen(request, timeout):
+                    calls.append(request)
+                    raise self.http_error(code)
+
+                client = RestClient(api_key="k", max_retries=2, sleep=lambda _: None)
+                with mock.patch("urllib.request.urlopen", fake_urlopen):
+                    with self.assertRaises(InfraError) as caught:
+                        client.generate("m", {})
+                self.assertIn(f"HTTP {code}", str(caught.exception))
+                self.assertIn("quota", str(caught.exception))  # Google's own message is kept
+                self.assertEqual(len(calls), expected_calls)
+
+    def test_request_shape(self):
+        seen = {}
+
+        def fake_urlopen(request, timeout):
+            seen.update(url=request.full_url, key=request.get_header("X-goog-api-key"),
+                        body=json.loads(request.data))
+            return io.BytesIO(b"{}")
+
+        with mock.patch("urllib.request.urlopen", fake_urlopen):
+            RestClient(api_key="secret").generate("some-model", {"contents": []})
+        self.assertEqual(seen["url"],
+                         "https://generativelanguage.googleapis.com/v1beta/models/some-model:generateContent")
+        self.assertEqual(seen["key"], "secret")
+        self.assertEqual(seen["body"], {"contents": []})
 
 
 if __name__ == "__main__":

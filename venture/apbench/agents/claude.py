@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 
-from ..tools import POLICY_TEXT, SPECS
+from ..tools import POLICY_TEXT, SPECS, InfraError
 
 SYSTEM = (
     "You are the accounts-payable agent for a mid-size company. You read and change the "
@@ -29,6 +29,7 @@ class ClaudeAgent:
             client = anthropic.Anthropic()
         self.client = client
         self.name = model
+        self.meta = {"provider": "anthropic", "model": model, "effort": effort}
         self.max_turns = max_turns
         self.request = {
             "model": model,
@@ -44,7 +45,10 @@ class ClaudeAgent:
     def run(self, task, env):
         messages = [{"role": "user", "content": task.instruction}]
         for _ in range(self.max_turns):
-            response = self.client.messages.create(messages=messages, **self.request)
+            try:
+                response = self.client.messages.create(messages=messages, **self.request)
+            except Exception as exc:  # the SDK has already retried transient errors
+                raise InfraError(f"Anthropic API call failed: {exc}") from exc
             if response.stop_reason == "end_turn":
                 return
             if response.stop_reason != "tool_use":  # refusal, max_tokens, ...

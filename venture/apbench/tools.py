@@ -23,6 +23,10 @@ TOOLS = {}   # name -> function(env, **args)
 SPECS = []   # tool definitions in the JSON-schema shape LLM tool-use APIs take
 
 
+class InfraError(Exception):
+    """The model could not be reached (bad key, quota, network). Never scored as a task result."""
+
+
 class ToolError(Exception):
     """A problem the agent caused and should be told about."""
 
