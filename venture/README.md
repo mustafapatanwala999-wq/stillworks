@@ -12,12 +12,26 @@ Python 3.10+ and nothing else for the sandbox and the two scripted agents.
 Run everything from this folder.
 
 ```bash
-python -m unittest discover -s tests       # 18 tests
+python -m unittest discover -s tests       # 30 tests
 python -m apbench.run --agent reference    # policy implemented in code: 25/25
 python -m apbench.run --agent naive        # does whatever it is asked: 5/25
 ```
 
-To test a Claude model, install the SDK and provide credentials:
+To test a model, give the harness a key. Two adapters exist.
+
+**Free: Gemini.** Google AI Studio issues API keys without a card. Create the key
+in a project with no billing attached, so it cannot charge you, and check
+Google's current free-tier limits there; they are not assumed anywhere in this
+repo. The adapter uses only the Python standard library.
+
+```bash
+export GEMINI_API_KEY=...
+python -m apbench.agents.gemini                # lists models your key can call
+python -m apbench.run --agent gemini --model <a model id from that list> --tasks T05,T17,T24
+python -m apbench.run --agent gemini --model <id> --resume   # full run, resumable
+```
+
+**Paid: Claude.**
 
 ```bash
 pip install anthropic
@@ -26,8 +40,11 @@ python -m apbench.run --agent claude --model claude-opus-5-5
 python -m apbench.run --agent claude --model claude-haiku-5-5 --tasks T05,T17,T24
 ```
 
-Each run prints one line per task with the reasons for any failure, then writes
-the full record, including every tool call, to `results/<agent>.json`.
+Each run prints one line per task with the reasons for any failure and writes
+the full record, including every tool call, to `results/<agent>.json` after every
+task. If the model cannot be reached (bad key, quota used up, network down) the
+run stops with exit code 2 and does not score the task it was on, so an outage
+never shows up as a model failure. Fix the cause and rerun with `--resume`.
 
 ## How grading works
 
@@ -92,10 +109,12 @@ the job was done and the ledger says otherwise.
   where the request and the policy agree and fails the other 20, all as
   `unsafe` silent failures. It shows the verifier tells compliant work from
   plausible-looking work.
-- `claude` runs a Claude model through the Anthropic Messages API. Its loop is
-  tested against a scripted client and its request parameters are checked
-  against the installed SDK, but **no live model has been run yet**, so there
-  are no model scores in this repo.
+- `claude` runs a Claude model through the Anthropic Messages API, and `gemini`
+  runs a Gemini model through Google's REST API. Both loops are tested against
+  scripted clients. The Gemini request shapes were written without access to
+  Google's docs and are confirmed only by the first live run; a bad key was
+  confirmed to stop the run without scoring. **No live model has been run yet**,
+  so there are no model scores in this repo.
 
 To test another vendor's agent, give it the tool definitions in
 `apbench.tools.SPECS`, route its tool calls to `Env.call`, and pass an object
