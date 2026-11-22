@@ -1,8 +1,9 @@
 """Decision records: metadata only, strictly validated.
 
 A record describes one utilization-review request and its outcome. It carries an
-opaque request id, never anything that identifies a patient. A file with a
-patient-identifying column name is refused outright rather than ignored.
+opaque request id and no name or member id. A file with a patient-identifying
+column name is refused outright rather than ignored. Exact dates tied to one
+request can still be protected health information, so use synthetic data only.
 """
 from __future__ import annotations
 

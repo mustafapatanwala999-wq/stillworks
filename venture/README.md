@@ -130,10 +130,12 @@ a recurring, regulator-driven duty that insurers and review vendors must prove.*
 
 What the research supports, and what it does not:
 
-- **In force and checkable:** Maryland HB 1563 (chapter 165, effective 2026-06-01)
-  adds a quarterly carrier report: adverse-decision counts, service type, whether
-  an AI or software tool was used, overturned counts, requests made and granted.
-  Maryland's HB 820 asks for human clinician decisions on medical necessity.
+- **In force, but probably not new:** Maryland HB 1563 (chapter 165, effective
+  2026-06-01) *amends* an existing quarterly carrier report on adverse decisions,
+  and the regulator's reporting-form bulletin is numbered 25-15, which suggests
+  carriers already file on a form. The AI-involvement item may be one added line
+  on a report they already produce. Which bill added it is unclear from the
+  sources. Maryland's HB 820 asks for human clinician decisions on medical necessity.
 - **Corrected along the way:** an earlier claim of Iowa quarterly reporting was
   wrong. No such duty was found, and the Iowa AI limit appears to apply only to
   requests from 2027-07-01.
@@ -143,8 +145,11 @@ What the research supports, and what it does not:
   in `utilreview/rules.json` is marked `unverified` with source links and a caveat.
   Counsel must check each against the enacted text. This is not legal advice.
 
-What it does, on synthetic metadata only (no patient identifiers; a file with
-patient-identifying column names is refused):
+What it does, on **synthetic data only**. The format has no names or member ids
+and a file with patient-identifying column names is refused, but exact dates tied
+to an individual request can still be protected health information under HIPAA.
+Do not run this on real records, and do not ask anyone for them. The output is a
+sketch of the counts a state report asks for, not the Maryland report itself.
 
 ```bash
 python -m utilreview demo                       # synthetic records: flags + quarterly counts
@@ -155,9 +160,10 @@ python -m utilreview reconcile records.csv filed.json   # recompute counts and d
 
 The kill test, before writing more code: ask someone who works at a health plan
 or a utilization-review vendor, "How do you produce the AI-involvement count for
-your state report today, and who owns it?" If it is already a field their system
-fills in, this is a feature, not a company. Also ask whether the plans or their
-review vendors would buy faster, and what they pay for compliance tooling today.
+your state report today, and who owns it?" This needs no data from them. **If it
+is already a field their system fills in, stop: this is a feature, not a
+company.** Otherwise ask whether the plans or their review vendors would buy
+faster, and what they pay for compliance tooling today.
 
 ## What this is not yet
 
