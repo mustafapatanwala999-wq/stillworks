@@ -1,0 +1,108 @@
+{
+  "_notice": "Every rule below was compiled from search-result summaries of law-firm and news sources. No statute text was read in full. Each rule is marked unverified and must be checked against the enacted text by counsel before anyone relies on it. This is not legal advice.",
+  "rules": [
+    {
+      "id": "MD-HB820-human-review",
+      "state": "MD",
+      "checks": "human_review",
+      "applies_from": "2025-10-01",
+      "applies_to": ["carrier", "pharmacy_benefits_manager", "private_review_agent"],
+      "summary": "Medical-necessity decisions must be made by a human clinician, not an AI or software tool alone.",
+      "citation": "Maryland HB 820 (2025 session)",
+      "sources": [
+        "https://mgaleg.maryland.gov/2025RS/bills/hb/hb0820T.pdf",
+        "https://www.alston.com/en/insights/publications/2025/09/maryland-ai-health-care-utilization-management"
+      ],
+      "unverified": true,
+      "caveat": "Effective date and exact scope taken from secondary summaries."
+    },
+    {
+      "id": "MD-HB1563-quarterly-report",
+      "state": "MD",
+      "checks": "quarterly_report",
+      "applies_from": "2026-06-01",
+      "applies_to": ["carrier"],
+      "summary": "Carriers file a quarterly report with the Insurance Commissioner: number of adverse decisions, service type, whether an AI, algorithm or other software tool was used in the adverse decision, number overturned on reconsideration, and requests made and granted.",
+      "citation": "Md. Code, Ins. 15-10A-06 as amended by 2026 Md. Laws ch. 165 (HB 1563)",
+      "sources": [
+        "https://mgaleg.maryland.gov/2026RS/Chapters_noln/CH_165_hb1563t.pdf",
+        "https://insurance.maryland.gov/Insurer/Documents/bulletins/25-15-Updates-to-Carrier-Reporting-Form-for-Adverse-Decisions-and-Grievances.pdf",
+        "https://www.hklaw.com/en/insights/publications/2026/05/states-continue-efforts-to-regulate-ai-in-healthcare"
+      ],
+      "unverified": true,
+      "caveat": "Report items come from a floor version of the bill shown in search results. Whether the Commissioner's form counts calendar quarters, and whether private review agents must report, was not confirmed."
+    },
+    {
+      "id": "IA-HF2635-human-review",
+      "state": "IA",
+      "checks": "human_review",
+      "applies_from": "2027-07-01",
+      "applies_to": ["carrier", "utilization_review_organization"],
+      "summary": "AI may be used for initial prior-authorization review but may not be the sole basis to deny, delay or downgrade a medical-necessity request.",
+      "citation": "2026 Iowa Acts ch. 1087 (HF 2635), Iowa Code 514F.8",
+      "sources": [
+        "https://www.legis.iowa.gov/docs/acts/2026/CH1087.pdf",
+        "https://www.sheppard.com/insights/blogs/additional-states-continue-legislative-trend-with-new-laws-limiting-use-of-artificial-intelligence-in-health-insurance-determinations"
+      ],
+      "unverified": true,
+      "caveat": "Sources conflict on timing: a law-firm summary gives July 1, 2026, while a search excerpt of the enrolled text says this subsection applies to requests made on or after July 1, 2027. The later date is used here. No quarterly reporting duty was found."
+    },
+    {
+      "id": "WA-human-review",
+      "state": "WA",
+      "checks": "human_review",
+      "applies_from": "2026-06-11",
+      "applies_to": ["carrier"],
+      "summary": "Algorithms may approve a prior-authorization request but may not deny one on medical-necessity grounds without human review of the patient's own record.",
+      "citation": "Washington 2026 session law (bill number not confirmed)",
+      "sources": [
+        "https://www.beckerspayer.com/policy-updates/7-ai-health-insurance-state-laws-passed-in-2026/"
+      ],
+      "unverified": true,
+      "caveat": "Bill number and effective date come from a trade-press summary only."
+    },
+    {
+      "id": "AZ-HB2175-human-review",
+      "state": "AZ",
+      "checks": "human_review",
+      "applies_from": "2026-07-01",
+      "applies_to": ["carrier"],
+      "summary": "A licensed medical director must individually review medical-necessity denials; AI alone may not be used to deny.",
+      "citation": "Arizona HB 2175 (2026 session)",
+      "sources": [
+        "https://noverica.com/state-ai-claim-denial-law/",
+        "https://www.beckerspayer.com/policy-updates/7-ai-health-insurance-state-laws-passed-in-2026/"
+      ],
+      "unverified": true,
+      "caveat": "Effective date reported by secondary sources only."
+    },
+    {
+      "id": "GA-SB444-human-review",
+      "state": "GA",
+      "checks": "human_review",
+      "applies_from": "2027-01-01",
+      "applies_to": ["carrier"],
+      "summary": "Coverage decisions may not be based solely on AI systems or other software tools.",
+      "citation": "Georgia SB 444 (2026 session)",
+      "sources": [
+        "https://www.beckerspayer.com/policy-updates/7-ai-health-insurance-state-laws-passed-in-2026/"
+      ],
+      "unverified": true,
+      "caveat": "One source lists January 1, 2027 and others conflict; confirm the date."
+    },
+    {
+      "id": "UT-SB319-disclosure-and-human-review",
+      "state": "UT",
+      "checks": "none",
+      "applies_from": "2027-01-01",
+      "applies_to": ["carrier"],
+      "summary": "Insurers must disclose AI use in prior-authorization review to the Insurance Department, providers and enrollees, and licensed professionals must make adverse determinations.",
+      "citation": "Utah SB 319 (2026 session)",
+      "sources": [
+        "https://www.beckerspayer.com/policy-updates/7-ai-health-insurance-state-laws-passed-in-2026/"
+      ],
+      "unverified": true,
+      "caveat": "Not checked by this tool: the record format has no disclosure fields. Start date sources conflict."
+    }
+  ]
+}

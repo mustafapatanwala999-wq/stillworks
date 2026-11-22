@@ -12,7 +12,7 @@ Python 3.10+ and nothing else for the sandbox and the two scripted agents.
 Run everything from this folder.
 
 ```bash
-python -m unittest discover -s tests       # 30 tests
+python -m unittest discover -s tests       # 50 tests
 python -m apbench.run --agent reference    # policy implemented in code: 25/25
 python -m apbench.run --agent naive        # does whatever it is asked: 5/25
 ```
@@ -119,6 +119,45 @@ the job was done and the ledger says otherwise.
 To test another vendor's agent, give it the tool definitions in
 `apbench.tools.SPECS`, route its tool calls to `Env.call`, and pass an object
 with `name` and `run(task, env)` to `apbench.run.run_task`.
+
+## utilreview: a second direction, to be tested before anyone builds more
+
+After more competitor research, the AP benchmark looks undifferentiated (Plato
+sells accounting environments, Mercor publishes accounting agent scores, and the
+"is your agent certified?" slot is owned by AIUC-1). `utilreview/` tests a
+different hypothesis: **state laws on AI in health-plan utilization review create
+a recurring, regulator-driven duty that insurers and review vendors must prove.**
+
+What the research supports, and what it does not:
+
+- **In force and checkable:** Maryland HB 1563 (chapter 165, effective 2026-06-01)
+  adds a quarterly carrier report: adverse-decision counts, service type, whether
+  an AI or software tool was used, overturned counts, requests made and granted.
+  Maryland's HB 820 asks for human clinician decisions on medical necessity.
+- **Corrected along the way:** an earlier claim of Iowa quarterly reporting was
+  wrong. No such duty was found, and the Iowa AI limit appears to apply only to
+  requests from 2027-07-01.
+- **No vendor found** selling compliance for these laws, in two searches. Those
+  searches were weak, so this is an absence of evidence, not proof.
+- **Everything is secondary-source.** No statute text was read in full. Every rule
+  in `utilreview/rules.json` is marked `unverified` with source links and a caveat.
+  Counsel must check each against the enacted text. This is not legal advice.
+
+What it does, on synthetic metadata only (no patient identifiers; a file with
+patient-identifying column names is refused):
+
+```bash
+python -m utilreview demo                       # synthetic records: flags + quarterly counts
+python -m utilreview check records.csv          # adverse AI decisions with no timely human-review record
+python -m utilreview report records.csv         # the quarterly counts a Maryland-style report asks for
+python -m utilreview reconcile records.csv filed.json   # recompute counts and diff against what was filed
+```
+
+The kill test, before writing more code: ask someone who works at a health plan
+or a utilization-review vendor, "How do you produce the AI-involvement count for
+your state report today, and who owns it?" If it is already a field their system
+fills in, this is a feature, not a company. Also ask whether the plans or their
+review vendors would buy faster, and what they pay for compliance tooling today.
 
 ## What this is not yet
 
